@@ -1,42 +1,68 @@
-﻿using SQLite;
+﻿
 using MAUI_Local_Storage.Models;
+using Newtonsoft.Json;
 
 namespace MAUI_Local_Storage.DataAccess
 {
     public class PersonData
     {
-        SQLiteAsyncConnection database;
-
-        async Task Init()
-        {
-            if (database is not null)
-            {
-                return;
-            }
-            database = new SQLiteAsyncConnection(DatabaseConstants.DatabasePath, DatabaseConstants.Flags);
-            await database.CreateTableAsync<Person>();
-        }
         public async Task<List<Person>> GetPeopleAsync()
         {
-            await Init();
-            return await database.Table<Person>().ToListAsync();
+            HttpClient client;
+
+            try
+            {
+                client = new HttpClient();
+                client.DefaultRequestHeaders.TryAddWithoutValidation
+                    ("Accept", "application/json");
+                List<Person> people = new List<Person>();
+
+                var response = await client.GetAsync("http://localhost:5147/api/Person");
+                if (response.IsSuccessStatusCode)
+                {
+                    var content = await response.Content.ReadAsStringAsync();
+
+                    if (!string.IsNullOrEmpty(content))
+                    {
+                        people = JsonConvert.DeserializeObject<List<Person>>(content);
+                    }
+                }
+                return people;
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
         }
+                                   
         public async Task<int> SavePersonAsync(Person person)
         {
-            await Init();
-            if (person.ID != 0)
+            HttpClient client;
+
+            try
             {
-                return await database.UpdateAsync(person);
+                client = new HttpClient();
+                client.DefaultRequestHeaders.TryAddWithoutValidation
+                    ("Accept", "application/json");
+
+                var Content = JsonConvert.SerializeObject(person);
+
+                var buff = System.Text.Encoding.UTF8.GetBytes(Content);
+
+                var byteContent = new ByteArrayContent(buff);
+
+                byteContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/json");
+
+                HttpResponseMessage response =
+                    await client.PostAsync("http://localhost:5147/api/Person", byteContent);
+                return response.IsSuccessStatusCode ? 1 : 0;
+
             }
-            else
+            catch (Exception ex)
             {
-                return await database.InsertAsync(person);
+                throw ex;
             }
-        }
-        public async Task<int> DeletePersonAsync(Person person)
-        {
-            await Init();
-            return await database.DeleteAsync(person);
         }
     }
 }
+       
